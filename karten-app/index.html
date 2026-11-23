@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Karten ziehen</title>
+<meta name="theme-color" content="#f0500a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Karten">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" href="icons/icon-192.png">
+<style>
+  :root{
+    --o:#f0500a; --o-dark:#c63f05; --o-soft:#ffe3d3; --o-tint:#fff4ec;
+    --bg:#f6f3f0; --card:#fff; --text:#2b2320; --muted:#857a74; --line:#eadfd8;
+    --safe-b: env(safe-area-inset-bottom, 0px); --safe-t: env(safe-area-inset-top, 0px);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);
+       display:flex;flex-direction:column;overscroll-behavior-y:none}
+  header{background:var(--o);color:#fff;padding:calc(var(--safe-t) + 14px) 16px 14px;text-align:center;font-weight:700;font-size:20px;
+         box-shadow:0 2px 8px rgba(0,0,0,.12);position:relative;z-index:2}
+  main{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .view{display:none;padding:18px 16px 28px;max-width:520px;margin:0 auto}
+  .view.active{display:block}
+
+  /* Card */
+  .cardwrap{display:flex;justify-content:center}
+  .card{width:min(78vw,340px);background:var(--card);border-radius:10px;overflow:hidden;box-shadow:0 6px 22px rgba(120,50,10,.22);
+        cursor:pointer;user-select:none;-webkit-user-select:none;transition:transform .15s}
+  .card:active{transform:scale(.985)}
+  .card .title{height:52px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:19px;color:#555;
+               padding:0 10px;text-align:center}
+  .card .img{aspect-ratio:3/4;background:var(--o);position:relative}
+  .card .img img{width:100%;height:100%;object-fit:cover;display:block}
+  .card .back{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;
+              background:repeating-linear-gradient(45deg,var(--o) 0 18px,#f25d1c 18px 36px)}
+  .card .back .q{font-size:84px;font-weight:800;line-height:1}
+  .card .back .h{margin-top:12px;font-size:16px;opacity:.95}
+  .card.spinning .title{color:var(--o)}
+  .card.drawn{animation:pop .35s ease}
+  @keyframes pop{0%{transform:scale(.94)}60%{transform:scale(1.03)}100%{transform:scale(1)}}
+
+  .btn{display:block;width:100%;border:0;border-radius:14px;padding:16px;font-size:18px;font-weight:700;cursor:pointer;font-family:inherit}
+  .btn-main{background:var(--o);color:#fff;box-shadow:0 4px 12px rgba(240,80,10,.35);margin-top:22px}
+  .btn-main:active{background:var(--o-dark)}
+  .btn-main.stop{background:#2b2320;box-shadow:0 4px 12px rgba(0,0,0,.25)}
+  .btn-ghost{background:var(--o-soft);color:var(--o-dark)}
+  .btn-danger{background:#fde4e1;color:#b3261e}
+  .btn-small{padding:12px;font-size:16px}
+
+  .hint{text-align:center;color:var(--muted);font-size:14px;margin-top:10px;min-height:20px}
+
+  .panel{background:var(--card);border-radius:14px;padding:16px;margin-top:20px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+  .panel h3{margin:0 0 10px;font-size:15px;color:var(--o-dark)}
+  label{display:block;font-size:13px;font-weight:600;color:var(--muted);margin:10px 0 6px}
+  input,textarea{width:100%;font:inherit;font-size:16px;padding:12px;border:1.5px solid var(--line);border-radius:10px;background:var(--o-tint);color:var(--text)}
+  input:focus,textarea:focus{outline:none;border-color:var(--o);background:#fff}
+  textarea{min-height:90px;resize:vertical}
+  .row{display:flex;gap:10px;margin-top:14px}
+  .row .btn{flex:1}
+  .saved{color:#2e7d32;font-size:14px;font-weight:600;text-align:center;margin-top:10px;min-height:18px}
+
+  /* History */
+  .histhead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px}
+  .histhead h2{margin:0;font-size:20px}
+  .histhead span{color:var(--muted);font-size:14px}
+  .search{margin-bottom:12px}
+  .entry{display:flex;gap:12px;background:var(--card);border-radius:12px;padding:10px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,.06);cursor:pointer}
+  .entry img{width:58px;height:77px;object-fit:cover;border-radius:6px;flex:none;background:var(--o)}
+  .entry .info{flex:1;min-width:0}
+  .entry .t{font-weight:700;font-size:17px}
+  .entry .d{color:var(--muted);font-size:13px;margin-top:2px}
+  .entry .n{font-size:14px;margin-top:6px;color:#4a3f3a;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:pre-wrap}
+  .chip{display:inline-block;background:var(--o-soft);color:var(--o-dark);border-radius:20px;padding:2px 9px;font-size:12px;font-weight:700;margin-left:6px;vertical-align:2px}
+  .empty{text-align:center;color:var(--muted);padding:50px 20px;line-height:1.5}
+
+  /* All cards */
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .mini{background:var(--card);border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+  .mini div{font-size:11px;font-weight:700;color:#555;text-align:center;padding:5px 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mini img{width:100%;aspect-ratio:3/4;object-fit:cover;display:block}
+
+  /* Detail sheet */
+  .sheet-bg{position:fixed;inset:0;background:rgba(30,15,5,.5);display:none;z-index:10;align-items:flex-end;justify-content:center}
+  .sheet-bg.open{display:flex}
+  .sheet{background:var(--bg);width:100%;max-width:520px;max-height:92vh;overflow-y:auto;border-radius:20px 20px 0 0;padding:14px 16px calc(20px + var(--safe-b))}
+  .sheet .grab{width:42px;height:5px;background:#d8cbc3;border-radius:3px;margin:0 auto 14px}
+  .sheet .card{width:min(58vw,240px);cursor:default}
+  .sheet .meta{text-align:center;color:var(--muted);font-size:14px;margin-top:12px}
+
+  nav{display:flex;background:#fff;border-top:1px solid var(--line);padding-bottom:var(--safe-b)}
+  nav button{flex:1;border:0;background:none;padding:10px 0 9px;font:inherit;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px}
+  nav button svg{width:24px;height:24px}
+  nav button.active{color:var(--o)}
+</style>
+</head>
+<body>
+<header id="hdr">Karten ziehen</header>
+<main>
+  <!-- Ziehen -->
+  <section class="view active" id="v-draw">
+    <div class="cardwrap">
+      <div class="card" id="card" role="button" aria-label="Karte ziehen">
+        <div class="title" id="cardTitle">&nbsp;</div>
+        <div class="img" id="cardImg">
+          <div class="back" id="cardBack"><div class="q">?</div><div class="h">Tippen zum Ziehen</div></div>
+        </div>
+      </div>
+    </div>
+    <button class="btn btn-main" id="drawBtn">Karte ziehen</button>
+    <div class="hint" id="hint">Einmal tippen startet, nochmal tippen stoppt.</div>
+
+    <div class="panel" id="afterDraw" hidden>
+      <h3>Gezogen & in der Historie gespeichert</h3>
+      <label for="nameIn">Für wen? (optional, leer = ich)</label>
+      <input id="nameIn" list="names" autocomplete="off" placeholder="z.B. Mama">
+      <label for="noteIn">Notiz (optional)</label>
+      <textarea id="noteIn" placeholder="Gedanken zur Karte …"></textarea>
+      <div class="row">
+        <button class="btn btn-ghost btn-small" id="saveBtn">Speichern</button>
+      </div>
+      <div class="saved" id="savedMsg"></div>
+    </div>
+  </section>
+
+  <!-- Historie -->
+  <section class="view" id="v-hist">
+    <div class="histhead"><h2>Historie</h2><span id="histCount"></span></div>
+    <input class="search" id="search" type="search" placeholder="Suchen (Karte, Name, Notiz)">
+    <div id="histList"></div>
+  </section>
+
+  <!-- Alle Karten -->
+  <section class="view" id="v-all">
+    <div class="histhead"><h2>Alle Karten</h2><span id="allCount"></span></div>
+    <div class="grid" id="grid"></div>
+  </section>
+</main>
+
+<nav>
+  <button class="active" data-v="v-draw" aria-label="Ziehen">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="3" width="12" height="18" rx="2"/><path d="M12 9v6M9 12h6"/></svg>Ziehen</button>
+  <button data-v="v-hist" aria-label="Historie">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Historie</button>
+  <button data-v="v-all" aria-label="Alle Karten">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="9" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Karten</button>
+</nav>
+
+<datalist id="names"></datalist>
+
+<div class="sheet-bg" id="sheetBg">
+  <div class="sheet" id="sheet">
+    <div class="grab"></div>
+    <div class="cardwrap">
+      <div class="card"><div class="title" id="dTitle"></div><div class="img"><img id="dImg" alt=""></div></div>
+    </div>
+    <div class="meta" id="dMeta"></div>
+    <label for="dName">Für wen? (optional)</label>
+    <input id="dName" list="names" autocomplete="off" placeholder="leer = ich">
+    <label for="dNote">Notiz</label>
+    <textarea id="dNote" placeholder="Gedanken zur Karte …"></textarea>
+    <div class="row">
+      <button class="btn btn-main btn-small" style="margin-top:0" id="dSave">Speichern</button>
+      <button class="btn btn-ghost btn-small" id="dClose">Schließen</button>
+    </div>
+    <div class="row"><button class="btn btn-danger btn-small" id="dDel">Eintrag löschen</button></div>
+  </div>
+</div>
+
+<script src="cards.js"></script>
+<script>
+(function(){
+  const KEY = 'karten-historie-v1';
+  const $ = id => document.getElementById(id);
+
+  // ---------- storage ----------
+  function load(){ try{ return JSON.parse(localStorage.getItem(KEY)) || []; }catch(e){ return []; } }
+  let hist = load();
+  function persist(){ try{ localStorage.setItem(KEY, JSON.stringify(hist)); return true; }catch(e){ return false; } }
+  if (navigator.storage && navigator.storage.persist) { navigator.storage.persist().catch(()=>{}); }
+
+  // preload images so the cycling is smooth
+  const imgs = CARDS.map(c => { const i = new Image(); i.src = c.i; return i; });
+
+  // ---------- drawing ----------
+  const card = $('card'), titleEl = $('cardTitle'), imgBox = $('cardImg'), btn = $('drawBtn');
+  let state = 'idle', timer = null, cur = -1, currentEntry = null;
+  const imgEl = document.createElement('img'); imgEl.alt = '';
+
+  function show(i){
+    cur = i;
+    titleEl.textContent = CARDS[i].t;
+    imgEl.src = CARDS[i].i;
+    if (!imgEl.parentNode){ imgBox.innerHTML = ''; imgBox.appendChild(imgEl); }
+  }
+  function rnd(){ let i; do { i = Math.floor(Math.random()*CARDS.length); } while (CARDS.length > 1 && i === cur); return i; }
+
+  function start(){
+    state = 'spinning';
+    card.classList.remove('drawn'); card.classList.add('spinning');
+    $('afterDraw').hidden = true;
+    btn.textContent = 'Stopp!'; btn.classList.add('stop');
+    $('hint').textContent = 'Tippe nochmal, um die Karte zu wählen.';
+    show(rnd());
+    timer = setInterval(() => show(rnd()), 85);
+  }
+  function stop(){
+    clearInterval(timer); timer = null;
+    state = 'idle';
+    card.classList.remove('spinning'); void card.offsetWidth; card.classList.add('drawn');
+    btn.textContent = 'Neue Karte ziehen'; btn.classList.remove('stop');
+    $('hint').textContent = '';
+    if (navigator.vibrate) navigator.vibrate(40);
+    const c = CARDS[cur];
+    currentEntry = { id: Date.now().toString(36) + Math.random().toString(36).slice(2,6), t: c.t, i: c.i, ts: Date.now(), name: '', note: '' };
+    hist.unshift(currentEntry);
+    persist();
+    $('nameIn').value = ''; $('noteIn').value = ''; $('savedMsg').textContent = '';
+    $('afterDraw').hidden = false;
+    renderHist();
+  }
+  function toggle(){ state === 'spinning' ? stop() : start(); }
+  btn.addEventListener('click', toggle);
+  card.addEventListener('click', toggle);
+
+  function saveCurrent(showMsg){
+    if (!currentEntry) return;
+    currentEntry.name = $('nameIn').value.trim();
+    currentEntry.note = $('noteIn').value.trim();
+    const ok = persist();
+    renderHist();
+    if (showMsg) $('savedMsg').textContent = ok ? 'Gespeichert ✓' : 'Konnte nicht speichern (Speicher blockiert?)';
+  }
+  let deb;
+  ['nameIn','noteIn'].forEach(id => $(id).addEventListener('input', () => { $('savedMsg').textContent=''; clearTimeout(deb); deb = setTimeout(() => saveCurrent(false), 500); }));
+  $('saveBtn').addEventListener('click', () => { document.activeElement.blur(); saveCurrent(true); });
+
+  // ---------- history ----------
+  const fmt = new Intl.DateTimeFormat('de-DE', { weekday:'short', day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+  function esc(s){ return s.replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])); }
+  function renderNames(){
+    const names = [...new Set(hist.map(h => h.name).filter(Boolean))];
+    $('names').innerHTML = names.map(n => `<option value="${esc(n)}">`).join('');
+  }
+  function renderHist(){
+    const q = $('search').value.trim().toLowerCase();
+    const list = q ? hist.filter(h => (h.t + ' ' + h.name + ' ' + h.note).toLowerCase().includes(q)) : hist;
+    $('histCount').textContent = hist.length === 1 ? '1 Karte' : hist.length + ' Karten';
+    if (!hist.length){ $('histList').innerHTML = '<div class="empty">Noch keine Karten gezogen.<br>Zieh deine erste Karte!</div>'; renderNames(); return; }
+    if (!list.length){ $('histList').innerHTML = '<div class="empty">Nichts gefunden.</div>'; return; }
+    $('histList').innerHTML = list.map(h => `
+      <div class="entry" data-id="${h.id}">
+        <img src="${h.i}" alt="" loading="lazy">
+        <div class="info">
+          <div class="t">${esc(h.t)}${h.name ? `<span class="chip">${esc(h.name)}</span>` : ''}</div>
+          <div class="d">${fmt.format(new Date(h.ts))}</div>
+          ${h.note ? `<div class="n">${esc(h.note)}</div>` : ''}
+        </div>
+      </div>`).join('');
+    renderNames();
+  }
+  $('search').addEventListener('input', renderHist);
+  $('histList').addEventListener('click', e => { const el = e.target.closest('.entry'); if (el) openDetail(el.dataset.id); });
+
+  // ---------- detail sheet ----------
+  let openId = null, delArmed = false;
+  function openDetail(id){
+    const h = hist.find(x => x.id === id); if (!h) return;
+    openId = id; delArmed = false; $('dDel').textContent = 'Eintrag löschen';
+    $('dTitle').textContent = h.t; $('dImg').src = h.i;
+    $('dMeta').textContent = fmt.format(new Date(h.ts));
+    $('dName').value = h.name || ''; $('dNote').value = h.note || '';
+    $('sheetBg').classList.add('open');
+  }
+  function closeDetail(){ $('sheetBg').classList.remove('open'); openId = null; }
+  $('dSave').addEventListener('click', () => {
+    const h = hist.find(x => x.id === openId); if (!h) return;
+    h.name = $('dName').value.trim(); h.note = $('dNote').value.trim();
+    persist(); renderHist();
+    if (currentEntry && currentEntry.id === h.id){ $('nameIn').value = h.name; $('noteIn').value = h.note; }
+    closeDetail();
+  });
+  $('dClose').addEventListener('click', closeDetail);
+  $('sheetBg').addEventListener('click', e => { if (e.target === $('sheetBg')) closeDetail(); });
+  $('dDel').addEventListener('click', () => {
+    if (!delArmed){ delArmed = true; $('dDel').textContent = 'Wirklich löschen? Nochmal tippen'; return; }
+    hist = hist.filter(x => x.id !== openId);
+    if (currentEntry && currentEntry.id === openId){ currentEntry = null; $('afterDraw').hidden = true; }
+    persist(); renderHist(); closeDetail();
+  });
+
+  // ---------- all cards ----------
+  $('allCount').textContent = CARDS.length + ' Karten';
+  $('grid').innerHTML = CARDS.map(c => `<div class="mini"><div>${esc(c.t)}</div><img src="${c.i}" alt="" loading="lazy"></div>`).join('');
+
+  // ---------- tabs ----------
+  const titles = { 'v-draw':'Karten ziehen', 'v-hist':'Historie', 'v-all':'Alle Karten' };
+  document.querySelectorAll('nav button').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('nav button').forEach(x => x.classList.toggle('active', x === b));
+    document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === b.dataset.v));
+    $('hdr').textContent = titles[b.dataset.v];
+    document.querySelector('main').scrollTop = 0;
+  }));
+
+  renderHist();
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(()=>{}));
+  }
+})();
+</script>
+</body>
+</html>
